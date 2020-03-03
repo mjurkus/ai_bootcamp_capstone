@@ -1,17 +1,16 @@
-import time
 import os
-import hashlib
 
+import tensorflow as tf
 from absl import app, flags, logging
 from absl.flags import FLAGS
 from pathlib import Path
-import tensorflow as tf
+
 import lxml.etree
 import tqdm
 
 flags.DEFINE_string('data_dir', './data/images/', 'path to raw PASCAL VOC dataset')
-flags.DEFINE_enum('split', 'train', ['train', 'val'], 'specify train or val spit')
-flags.DEFINE_string('output_file', './data/images/military_train.tfrecord', 'outpot dataset')
+flags.DEFINE_enum('split', 'val', ['train', 'val'], 'specify train or val spit')
+flags.DEFINE_string('output_file', './data/images/military_val.tfrecord', 'outpot dataset')
 flags.DEFINE_string('classes', './data/classes.txt', 'classes file')
 
 

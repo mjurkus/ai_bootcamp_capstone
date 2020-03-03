@@ -10,3 +10,4 @@ model/
 xception-*/
 submission*
 *.npz
+yolo3_coco_ckp/

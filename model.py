@@ -13,9 +13,10 @@ from tensorflow.keras.layers import (
 )
 from tensorflow.keras.regularizers import l2
 
-from code import BatchNormalization
-from code import yolo_boxes, broadcast_iou
-from code import yolo_nms
+from helpers import BatchNormalization
+from helpers import yolo_boxes, broadcast_iou
+from helpers import yolo_nms
+from globals import yolo_anchors, yolo_anchor_masks
 
 
 def create_conv(x, filters, size, strides=1, batch_norm=True):
@@ -97,7 +98,7 @@ def create_yolo_out(filters, anchors, n_classes, name=None):
     return yolo_out
 
 
-def yolo_model(size, anchors, masks, n_classes, training=False):
+def yolo_model(size=416, anchors=yolo_anchors, masks=yolo_anchor_masks, n_classes=80, training=False):
     x = inputs = Input([size, size, 3], name="input")
 
     x_8, x = create_darknet(name="yolo_darknet")(x)
@@ -118,14 +119,14 @@ def yolo_model(size, anchors, masks, n_classes, training=False):
         lambda x: yolo_boxes(x, anchors[masks[1]], n_classes), name="yolo_boxes_1"
     )(out_1)
 
-    outputs = Lambda(lambda x: yolo_nms(x, anchors, masks, n_classes), name="yolo_nms")(
+    outputs = Lambda(lambda x: yolo_nms(x), name="yolo_nms")(
         (boxes_0[:3], boxes_1[:3])
     )
 
     return Model(inputs, outputs, name="yolo")
 
 
-def transfrom_img(image, size):
+def transform_img(image, size):
     image = tf.image.resize(image, (size, size))
     image = image / 255
     return image
@@ -166,13 +167,10 @@ def transform_targets_for_output(y_true, grid_size, anchor_idxs):
                 )
                 idx += 1
 
-    # tf.print(indexes.stack())
-    # tf.print(updates.stack())
-
     return tf.tensor_scatter_nd_update(y_true_out, indexes.stack(), updates.stack())
 
 
-def transform_targets(y_train, anchors, anchor_masks, size):
+def transform_targets(y_train, anchors, anchor_masks, size=416):
     y_outs = []
     grid_size = size // 32
 
@@ -251,7 +249,7 @@ def create_yolo_loss(anchors, n_classes, ignore_treshold=0.5):
         )
         obj_loss = keras.losses.binary_crossentropy(true_obj, pred_obj)
         obj_loss = obj_mask * obj_loss + (1 - obj_mask) * ignore_mask * obj_loss
-        # TODO: use binary_crossentropy instead
+
         class_loss = obj_mask * keras.losses.sparse_categorical_crossentropy(
             true_class_idx, pred_class
         )
