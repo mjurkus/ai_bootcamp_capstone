@@ -12,7 +12,7 @@ flags.DEFINE_boolean('latest_weights', True, 'Use latest weights from default ch
 flags.DEFINE_string('weights', "checkpoints", 'weights path')
 
 IMG_SIZE = 416
-BATCH_SIZE = 3
+BATCH_SIZE = 6
 
 
 def main(_argv):
@@ -61,7 +61,7 @@ def main(_argv):
             logging.info(f"Loaded weights from '{FLAGS.weights}'")
     else:
         pretrained = yolo_model(n_classes=80, training=True)
-        pretrained.load_weights("yolo3_coco_ckp/yolov3-tiny.tf")
+        pretrained.load_weights("yolo3_coco_ckp/yolov3.tf")
 
         model.get_layer("yolo_darknet").set_weights(
             pretrained.get_layer("yolo_darknet").get_weights()
@@ -69,23 +69,24 @@ def main(_argv):
 
     freeze_all(model.get_layer("yolo_darknet"))
 
-    optimizer = tf.keras.optimizers.Adam(lr=1e-5)
+    optimizer = tf.keras.optimizers.Adam(lr=1e-2)
     loss = [
         create_yolo_loss(yolo_anchors[mask], n_classes=len(class_names)) for mask in yolo_anchor_masks
     ]
     model.compile(optimizer=optimizer, loss=loss, run_eagerly=True)
     callbacks = [
-        tf.keras.callbacks.ReduceLROnPlateau(verbose=1),
-        tf.keras.callbacks.EarlyStopping(patience=3, verbose=1),
+        tf.keras.callbacks.ReduceLROnPlateau(verbose=1, factor=0.3, patience=2),
+        tf.keras.callbacks.EarlyStopping(patience=5, verbose=1),
         tf.keras.callbacks.ModelCheckpoint(
-            "checkpoints/yolov3_train_{epoch}.tf", verbose=1, save_weights_only=True, save_best_only=True
+            "checkpoints/yolo_train_{epoch}.tf", verbose=1, save_weights_only=True, save_best_only=True
         ),
-        TrainCycle(epochs=50, lr=(1e-5, 1e-3), batch_size=BATCH_SIZE, train_set_size=282),
-        tf.keras.callbacks.TensorBoard()
+        # TrainCycle(epochs=100, lr=(1e-5, 1e-2), batch_size=BATCH_SIZE, train_set_size=914),
+        # tf.keras.callbacks.TensorBoard(),
+        tf.keras.callbacks.CSVLogger('logs/training.log', append=True),
     ]
 
-    history = model.fit(
-        train_ds, epochs=50, callbacks=callbacks, validation_data=val_ds, verbose=1
+    model.fit(
+        train_ds, epochs=100, callbacks=callbacks, validation_data=val_ds, verbose=1
     )
 
 

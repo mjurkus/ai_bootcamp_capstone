@@ -15,9 +15,9 @@ class YoloService:
 
     def __init__(self):
         app.logger.info("Initializing YoloService")
-        physical_devices = tf.config.experimental.list_physical_devices('GPU')
-        if len(physical_devices) > 0:
-            tf.config.experimental.set_memory_growth(physical_devices[0], True)
+        # physical_devices = tf.config.experimental.list_physical_devices('GPU')
+        # if len(physical_devices) > 0:
+        #     tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
         model_path = "models/latest"
 

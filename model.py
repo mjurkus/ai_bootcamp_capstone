@@ -7,9 +7,9 @@ from tensorflow.keras.layers import (
     Input,
     Lambda,
     LeakyReLU,
-    MaxPool2D,
     UpSampling2D,
     ZeroPadding2D,
+    Add
 )
 from tensorflow.keras.regularizers import l2
 
@@ -17,6 +17,21 @@ from helpers import BatchNormalization
 from helpers import yolo_boxes, broadcast_iou
 from helpers import yolo_nms
 from globals import yolo_anchors, yolo_anchor_masks
+
+
+def create_darknet_residual(x, filters):
+    prev = x
+    x = create_conv(x, filters // 2, 1)
+    x = create_conv(x, filters, 3)
+    x = Add()([prev, x])
+    return x
+
+
+def create_darknet_block(x, filters, blocks):
+    x = create_conv(x, filters, 3, strides=2)
+    for _ in range(blocks):
+        x = create_darknet_residual(x, filters)
+    return x
 
 
 def create_conv(x, filters, size, strides=1, batch_norm=True):
@@ -44,21 +59,15 @@ def create_conv(x, filters, size, strides=1, batch_norm=True):
 
 def create_darknet(name):
     x = inputs = Input([None, None, 3])
-    x = create_conv(x, 16, 3)
-    x = MaxPool2D(2, 2, "same")(x)
-    x = create_conv(x, 32, 3)
-    x = MaxPool2D(2, 2, "same")(x)
-    x = create_conv(x, 64, 3)
-    x = MaxPool2D(2, 2, "same")(x)
-    x = create_conv(x, 128, 3)
-    x = MaxPool2D(2, 2, "same")(x)
-    x = x_8 = create_conv(x, 256, 3)  # skip connection
-    x = MaxPool2D(2, 2, "same")(x)
-    x = create_conv(x, 512, 3)
-    x = MaxPool2D(2, 1, "same")(x)
-    x = create_conv(x, 1024, 3)
 
-    return Model(inputs, (x_8, x), name=name)
+    x = create_conv(x, 32, 3)
+    x = create_darknet_block(x, 64, 1)
+    x = create_darknet_block(x, 128, 2)
+    x = x_36 = create_darknet_block(x, 256, 8)
+    x = x_61 = create_darknet_block(x, 512, 8)
+    x = create_darknet_block(x, 1024, 4)
+
+    return Model(inputs, (x_36, x_61, x), name=name)
 
 
 def create_yolo_conv(filters, name):
@@ -73,7 +82,12 @@ def create_yolo_conv(filters, name):
             x = Concatenate()([x, x_skip])
         else:
             x = inputs = Input(x_in.shape[1:])
-            x = create_conv(x=x, filters=filters, size=1)
+
+        x = create_conv(x=x, filters=filters, size=1)
+        x = create_conv(x=x, filters=filters * 2, size=3)
+        x = create_conv(x=x, filters=filters, size=1)
+        x = create_conv(x=x, filters=filters * 2, size=3)
+        x = create_conv(x=x, filters=filters, size=1)
 
         return Model(inputs, x, name=name)(x_in)
 
@@ -101,16 +115,19 @@ def create_yolo_out(filters, anchors, n_classes, name=None):
 def yolo_model(size=416, anchors=yolo_anchors, masks=yolo_anchor_masks, n_classes=80, training=False):
     x = inputs = Input([size, size, 3], name="input")
 
-    x_8, x = create_darknet(name="yolo_darknet")(x)
+    x_36, x_61, x = create_darknet(name="yolo_darknet")(x)
 
-    x = create_yolo_conv(256, name="yolo_conv_0")(x)
-    out_0 = create_yolo_out(256, len(masks[0]), n_classes, name="yolo_out_0")(x)
+    x = create_yolo_conv(512, name="yolo_conv_0")(x)
+    out_0 = create_yolo_out(512, len(masks[0]), n_classes, name="yolo_out_0")(x)
 
-    x = create_yolo_conv(128, name="yolo_conv_1")((x, x_8))
-    out_1 = create_yolo_out(128, len(masks[1]), n_classes, name="yolo_out_1")(x)
+    x = create_yolo_conv(256, name="yolo_conv_1")((x, x_61))
+    out_1 = create_yolo_out(256, len(masks[1]), n_classes, name="yolo_out_1")(x)
+
+    x = create_yolo_conv(128, name="yolo_conv_2")((x, x_36))
+    out_2 = create_yolo_out(128, len(masks[1]), n_classes, name="yolo_out_2")(x)
 
     if training:
-        return Model(inputs, (out_0, out_1), name="yolo3")
+        return Model(inputs, (out_0, out_1, out_2), name="yolo3")
 
     boxes_0 = Lambda(
         lambda x: yolo_boxes(x, anchors[masks[0]], n_classes), name="yolo_boxes_0"
@@ -118,9 +135,12 @@ def yolo_model(size=416, anchors=yolo_anchors, masks=yolo_anchor_masks, n_classe
     boxes_1 = Lambda(
         lambda x: yolo_boxes(x, anchors[masks[1]], n_classes), name="yolo_boxes_1"
     )(out_1)
+    boxes_2 = Lambda(
+        lambda x: yolo_boxes(x, anchors[masks[2]], n_classes), name="yolo_boxes_2"
+    )(out_2)
 
     outputs = Lambda(lambda x: yolo_nms(x), name="yolo_nms")(
-        (boxes_0[:3], boxes_1[:3])
+        (boxes_0[:3], boxes_1[:3], boxes_2[:3])
     )
 
     return Model(inputs, outputs, name="yolo")

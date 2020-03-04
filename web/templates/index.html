@@ -1,8 +1,35 @@
-{% extends "base.html" %}
+{% extends "bootstrap/base.html" %}
+{% block title %}YOLOv3 admin{% endblock %}
+
 {% block content %}
+    <div class="container">
+        <h1>Hello, ML User</h1>
 
-    <h3>Hello World!</h3>
-    <hr/>
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">Upload new model version</h4>
+            </div>
+            <div class="panel-body">
+                <form method=POST enctype=multipart/form-data action="{{ url_for('upload_model') }}">
+                    <div class="form-group">
+                        <label for="model_id">Model ID</label>
+                        <input type="text" name="model_id" id="model_id" class="form-control" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="model_file">Model Archive</label>
+                        <input type=file name=model id="model_file" class="">
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary">Submit</button>
+                </form>
+            </div>
+        </div>
 
-    <p> done </p>
-{% endblock content %}
+        <hr/>
+
+        <div class="panel panel-default">
+            <div class="panel-body">
+                {{ current_models }}
+            </div>
+        </div>
+    </div>
+{% endblock %}

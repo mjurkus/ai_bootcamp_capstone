@@ -11,3 +11,4 @@ flask_marshmallow==0.8.0
 marshmallow-sqlalchemy==0.22.2
 psycopg2==2.7.5
 tensorflow==2.1.0
+flask_bootstrap==3.3.7.1

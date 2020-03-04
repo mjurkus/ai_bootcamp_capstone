@@ -118,10 +118,10 @@ def yolo_nms(outputs):
     boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
         boxes=tf.reshape(bbox, (tf.shape(bbox)[0], -1, 1, 4)),
         scores=tf.reshape(scores, (tf.shape(scores)[0], -1, tf.shape(scores)[-1])),
-        max_output_size_per_class=10,
-        max_total_size=10,
+        max_output_size_per_class=5,
+        max_total_size=5,
         iou_threshold=0.5,
-        score_threshold=0.5,
+        score_threshold=0.4,
     )
 
     return boxes, scores, classes, valid_detections

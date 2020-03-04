@@ -32,8 +32,8 @@ def main(_argv):
     class_names = [c.strip() for c in open("data/classes.txt").readlines()]
 
     model = yolo_model(n_classes=len(class_names))
-
-    model.load_weights('checkpoints/yolov3_train_14.tf').expect_partial()
+    latest_weights = tf.train.latest_checkpoint("checkpoints")
+    model.load_weights(latest_weights).expect_partial()
     logging.info('weights loaded')
 
     img_raw = tf.image.decode_image(open("data/images/2B9 VASILIOK/15.maxresdefault.jpg", 'rb').read(), channels=3)

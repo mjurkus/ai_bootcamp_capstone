@@ -15,13 +15,14 @@ def main(_argv):
     class_names = [c.strip() for c in open("data/classes.txt").readlines()]
 
     model = yolo_model(n_classes=len(class_names))
-
-    model.load_weights('checkpoints/yolov3_train_14.tf').expect_partial()
-    logging.info('weights loaded')
+    weights = tf.train.latest_checkpoint("checkpoints")
+    print(f"Loading weights from {weights}")
+    model.load_weights(weights).expect_partial()
+    logging.info('Weights loaded')
 
     model_save_path = 'model/latest'
 
-    logging.info(f"saving model to {model_save_path}")
+    logging.info(f"Saving model to {model_save_path}")
     tf.saved_model.save(model, model_save_path)
     shutil.copy2("data/classes.txt", model_save_path + "/assets")
 
@@ -40,7 +41,7 @@ def main(_argv):
     t1 = time.time()
     boxes, scores, classes, nums = model(img)
     t2 = time.time()
-    logging.info('time: {}'.format(t2 - t1))
+    logging.info('Inference time: {}'.format(t2 - t1))
 
     logging.info('Detections:')
     for i in range(nums[0]):
@@ -52,6 +53,8 @@ def main(_argv):
 
     logging.info(f"Archiving saved model to model/latest.zip")
     shutil.make_archive("model/latest", "zip", model_save_path)
+
+    print("Export completed.")
 
 
 if __name__ == '__main__':

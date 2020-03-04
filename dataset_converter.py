@@ -6,11 +6,9 @@ from absl.flags import FLAGS
 from pathlib import Path
 
 import lxml.etree
-import tqdm
+from fastprogress import fastprogress
 
 flags.DEFINE_string('data_dir', './data/images/', 'path to raw PASCAL VOC dataset')
-flags.DEFINE_enum('split', 'val', ['train', 'val'], 'specify train or val spit')
-flags.DEFINE_string('output_file', './data/images/military_val.tfrecord', 'outpot dataset')
 flags.DEFINE_string('classes', './data/classes.txt', 'classes file')
 
 
@@ -44,23 +42,15 @@ def build_example(annotation, class_map):
             truncated.append(int(obj['truncated']))
             views.append(obj['pose'].encode('utf8'))
 
-    example = tf.train.Example(features=tf.train.Features(feature={
-        'image/height': tf.train.Feature(int64_list=tf.train.Int64List(value=[height])),
-        'image/width': tf.train.Feature(int64_list=tf.train.Int64List(value=[width])),
+    return tf.train.Example(features=tf.train.Features(feature={
         'image/filename': tf.train.Feature(bytes_list=tf.train.BytesList(value=[annotation['filename'].encode('utf8')])),
         'image/encoded': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_raw])),
-        'image/format': tf.train.Feature(bytes_list=tf.train.BytesList(value=['jpeg'.encode('utf8')])),
         'image/object/bbox/xmin': tf.train.Feature(float_list=tf.train.FloatList(value=xmin)),
         'image/object/bbox/xmax': tf.train.Feature(float_list=tf.train.FloatList(value=xmax)),
         'image/object/bbox/ymin': tf.train.Feature(float_list=tf.train.FloatList(value=ymin)),
         'image/object/bbox/ymax': tf.train.Feature(float_list=tf.train.FloatList(value=ymax)),
         'image/object/class/text': tf.train.Feature(bytes_list=tf.train.BytesList(value=classes_text)),
-        'image/object/class/label': tf.train.Feature(int64_list=tf.train.Int64List(value=classes)),
-        'image/object/difficult': tf.train.Feature(int64_list=tf.train.Int64List(value=difficult_obj)),
-        'image/object/truncated': tf.train.Feature(int64_list=tf.train.Int64List(value=truncated)),
-        'image/object/view': tf.train.Feature(bytes_list=tf.train.BytesList(value=views)),
     }))
-    return example
 
 
 def parse_xml(xml):
@@ -78,21 +68,30 @@ def parse_xml(xml):
     return {xml.tag: result}
 
 
-def main(_argv):
-    class_map = {name: idx for idx, name in enumerate(
-        open(FLAGS.classes, encoding='utf-8').read().splitlines())}
-    logging.info("Class mapping loaded: %s", class_map)
-
-    writer = tf.io.TFRecordWriter(FLAGS.output_file)
-    image_list = open(os.path.join(FLAGS.data_dir, 'data_%s.txt' % FLAGS.split), encoding='utf-8').read().splitlines()
+def process_split(split, class_map):
+    writer = tf.io.TFRecordWriter(os.path.join(FLAGS.data_dir, f"military_{split}.tfrecord"))
+    image_list = open(os.path.join(FLAGS.data_dir, 'data_%s.txt' % split), encoding='utf-8').read().splitlines()
     logging.info("Image list loaded: %d", len(image_list))
-    for image in tqdm.tqdm(image_list):
+    for image in fastprogress.ProgressBar(image_list):
         annotation_xml = os.path.join("data", Path(image).with_suffix(".xml"))
         annotation_xml = lxml.etree.fromstring(open(annotation_xml).read())
         annotation = parse_xml(annotation_xml)['annotation']
         tf_example = build_example(annotation, class_map)
         writer.write(tf_example.SerializeToString())
     writer.close()
+
+
+def main(_argv):
+    class_map = {name: idx for idx, name in enumerate(
+        open(FLAGS.classes, encoding='utf-8').read().splitlines())}
+    logging.info("Class mapping loaded: %s", class_map)
+
+    splits = ["train", "val"]
+
+    for split in splits:
+        logging.info(f"Processing {split} dataset")
+        process_split(split, class_map)
+
     logging.info("Done")
 
 
