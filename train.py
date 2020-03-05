@@ -69,20 +69,18 @@ def main(_argv):
 
     freeze_all(model.get_layer("yolo_darknet"))
 
-    optimizer = tf.keras.optimizers.Adam(lr=1e-2)
+    optimizer = tf.keras.optimizers.Adam(lr=3e-5)
     loss = [
         create_yolo_loss(yolo_anchors[mask], n_classes=len(class_names)) for mask in yolo_anchor_masks
     ]
-    model.compile(optimizer=optimizer, loss=loss, run_eagerly=True)
+    model.compile(optimizer=optimizer, loss=loss, run_eagerly=False)
     callbacks = [
-        tf.keras.callbacks.ReduceLROnPlateau(verbose=1, factor=0.3, patience=2),
+        # tf.keras.callbacks.ReduceLROnPlateau(verbose=1, factor=0.3, patience=2),
         tf.keras.callbacks.EarlyStopping(patience=5, verbose=1),
         tf.keras.callbacks.ModelCheckpoint(
             "checkpoints/yolo_train_{epoch}.tf", verbose=1, save_weights_only=True, save_best_only=True
         ),
-        # TrainCycle(epochs=100, lr=(1e-5, 1e-2), batch_size=BATCH_SIZE, train_set_size=914),
-        # tf.keras.callbacks.TensorBoard(),
-        tf.keras.callbacks.CSVLogger('logs/training.log', append=True),
+        TrainCycle(epochs=100, lr=(3e-5, 1e-6), batch_size=BATCH_SIZE, train_set_size=914),
     ]
 
     model.fit(

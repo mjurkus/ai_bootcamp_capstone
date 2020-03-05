@@ -1,0 +1,41 @@
+{% extends "bootstrap/base.html" %}
+{% block title %}YOLOv3 admin{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1>Hello, ML User</h1>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">Upload photo to predict</h4>
+            </div>
+            <div class="panel-body">
+                <form method=POST enctype=multipart/form-data action="{{ url_for('predict_photo') }}">
+                    <div class="form-group">
+                        <label for="photo_file">Choose photo</label>
+                        <input type=file name=photo_file id="photo_file" class="">
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary">Submit</button>
+                </form>
+            </div>
+        </div>
+
+        <hr/>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">Latest prediction</h4>
+            </div>
+            <div>
+                 {{ detections }}
+            </div>
+            <div>
+                {% if prediction_photo != None %}
+                    <img src="{{ url_for('static', filename='predictions/' + prediction_photo) }}" alt="Prediction" class="img-responsive">
+                {% else %}
+                    <p>Upload photo to get predictions</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

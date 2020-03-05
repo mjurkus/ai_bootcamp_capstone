@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 from pathlib import Path
 import cv2
+import shutil
 
 
 class YoloService:
@@ -15,16 +16,23 @@ class YoloService:
 
     def __init__(self):
         app.logger.info("Initializing YoloService")
-        # physical_devices = tf.config.experimental.list_physical_devices('GPU')
-        # if len(physical_devices) > 0:
-        #     tf.config.experimental.set_memory_growth(physical_devices[0], True)
+        physical_devices = tf.config.experimental.list_physical_devices('GPU')
+        if len(physical_devices) > 0:
+            tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-        model_path = "models/latest"
+        model_id = open("models/.current").readline()
+        if model_id != "":
+            self.activate_model(model_id)
+        else:
+            app.logger.warn("There is no active model defined")
+
+    def activate_model(self, model_id):
+        model_path = f"models/{model_id}"
 
         if Path(model_path).exists():
             self.initialize_model(model_path)
         else:
-            app.logger.info("No models exits")
+            app.logger.error(f"Model {model_id} does not exist")
 
     def initialize_model(self, model_path):
         """Initalizes model and class names from model_path"""
@@ -34,6 +42,35 @@ class YoloService:
 
         self.class_names = self._load_class_names(model_path)
         app.logger.info(f"Model {model_path} successfully initialized")
+
+    def predict_and_save(self, img):
+        destination = Path("static/predictions") / Path(img).stem
+        destination.mkdir(parents=True, exist_ok=True)
+
+        photo_file = destination / "photo.jpg"
+        detections = destination / "detections.txt"
+
+        img_raw = tf.image.decode_image(open(img, 'rb').read(), channels=3)
+
+        img = tf.expand_dims(img_raw, 0)
+        img = YoloService.transform_img(img, YoloService.IMAGE_DIMS)
+
+        boxes, scores, classes, nums = self.model(img)
+
+        with open(str(detections), "w") as f:
+            for i in range(nums[0]):
+                cls = self.class_names[int(classes[0][i])]
+                score = np.array(scores[0][i])
+
+                f.write(f"{cls}::{score}\n")
+
+                app.logger.info('\t{}, {}, {}'.format(cls, score, np.array(boxes[0][i])))
+
+        img = cv2.cvtColor(img_raw.numpy(), cv2.COLOR_RGB2BGR)
+        img = YoloService.draw_outputs(img, (boxes, scores, classes, nums), self.class_names)
+        cv2.imwrite(str(photo_file), img)
+
+        return str(destination.stem)
 
     def predict(self, img):
         app.logger.info(f"Decoding {img}")
@@ -95,3 +132,18 @@ class YoloService:
     def transform_img(image, size):
         image = tf.image.resize(image, (size, size))
         return image / 255
+
+    @staticmethod
+    def draw_outputs(img, outputs, class_names):
+        boxes, objectness, classes, nums = outputs
+        boxes, objectness, classes, nums = boxes[0], objectness[0], classes[0], nums[0]
+        wh = np.flip(img.shape[0:2])
+        for i in range(nums):
+            print(f"Drawing output for {class_names[int(classes[i])]}")
+            x1y1 = tuple((np.array(boxes[i][0:2]) * wh).astype(np.int32))
+            x2y2 = tuple((np.array(boxes[i][2:4]) * wh).astype(np.int32))
+            img = cv2.rectangle(img, x1y1, x2y2, (255, 0, 0), 2)
+            img = cv2.putText(img, '{} {:.4f}'.format(
+                class_names[int(classes[i])], objectness[i]),
+                              x1y1, cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (0, 0, 255), 2)
+        return img

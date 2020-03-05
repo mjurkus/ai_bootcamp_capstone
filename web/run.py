@@ -1,9 +1,13 @@
-from flask import Flask, render_template, redirect, url_for
-from flask import request, jsonify
-from services.yolo_service import YoloService
 import logging
+from _datetime import datetime
+
+from flask import Flask, render_template, redirect, url_for
+from flask import request
 from flask_bootstrap import Bootstrap
+
 from domain.current_models import get_current_models, update_current_model, store_model
+from domain.predictions import get_predictions_table
+from services.yolo_service import YoloService
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s %(threadName)s : %(message)s')
 app = Flask(__name__)
@@ -36,6 +40,34 @@ def upload_model():
     store_model(file, model_id)
 
     return redirect("/")
+
+
+@app.route("/predict_photo", methods=["POST"])
+def predict_photo():
+    file = request.files['photo_file']
+    file_name = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    file_name = f"temp/{file_name}.jpg"
+    file.save(file_name)
+
+    result = app.yolo_service.predict_and_save(file_name)
+
+    return redirect(url_for('.show_prediction', q=result))
+
+
+@app.route("/prediction")
+def show_prediction():
+    destination = request.args.get('q')
+    prediction_photo = None
+    detections = get_predictions_table([])
+
+    print(destination)
+
+    if destination is not None:
+        prediction_photo = destination + '/photo.jpg'
+        detections = get_predictions_table([line.strip().split("::") for line in
+                                            open("static/predictions/" + destination + "/detections.txt").readlines()])
+
+    return render_template("prediction.html", prediction_photo=prediction_photo, detections=detections)
 
 
 @app.route('/activate_model')
