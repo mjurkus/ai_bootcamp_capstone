@@ -25,7 +25,13 @@ Detect, localize and classify military vehicles from the given photo.
 - WEB application to upload "latest model" and use it for prediction
 - Android application to take images and get predictions via API
 
+Complex object - base of a tank with mounded thermobaric weapon 
+<img src="https://user-images.githubusercontent.com/427661/75979188-a4e33a00-5ee8-11ea-8317-22b74c0a4c96.jpg" width=400/>
 
+<img src="https://user-images.githubusercontent.com/427661/75979190-a57bd080-5ee8-11ea-8ac6-d6827a80e371.jpg" width=400/>
+
+Multiple objects
+<img src="https://user-images.githubusercontent.com/427661/75979192-a6146700-5ee8-11ea-905b-3f2426d342ae.jpg" width=400/>
 
 #### Resources:
 - https://medium.com/analytics-vidhya/yolo-v3-theory-explained-33100f6d193
